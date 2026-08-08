@@ -55,7 +55,7 @@ export default {
                             <p>{{ level.id }}</p>
                         </li>
                         <li>
-                            <div class="type-title-sm">Length</div>
+                            <div class="type-title-sm">Difficulty</div>
                             <p>{{ level.enjoyment || 'None (0)' }}</p>
                         </li>
                     </ul>
@@ -78,7 +78,7 @@ export default {
                     </table>
                 </div>
                 <div v-else-if="!selected" class="level" style="height: 100%; display: flex; justify-content: center; align-items: center; text-align: center;">
-                    <h2>Welcome to the 30 FPS Spam Challenge List!</h2>
+                    <h2>Welcome to the DSM Levels List!</h2>
                     <p>Click the levels on the left side to see information about them!</p>
                     <p>For more information about the submission rules check the right side!</p>
                     <h2>le daily</h2>
@@ -129,7 +129,7 @@ export default {
                     </template>
                     <h3>Submission Requirements</h3>
                     <p>
-                        Your level <strong>must</strong> be under 30 seconds.
+                        Must be apart of the dsm discord server
                     </p>
                     <p>
                         Level must be harder than the level at the lowest spot on the list.
@@ -138,25 +138,25 @@ export default {
                         No inappropriate levels, as this includes NSFW levels/videos.
                     </p>
                     <p>
-                       Levels verified/beat with a cps cap will be placed separately.
+                       Levels dont have to be rated
                     </p>
                     <p>
-                        Levels verified/beat with a method outside alternating will be placed separately.
+                        uhhhh
                     </p>
                     <p>
                         Secret ways are <strong>absolutely</strong> prohibited.
                     </p>
                     <p>
-                        Levels have to be 30fps Minimum cps is 10.
+                        Levels have to be over 30 seconds
                     </p>
                     <p>
-                        The difficulty must be spam.
+                        Levels can not be too spammy
                     </p>
                     <p>
                         Noclip is allowed as long as you have 0 deaths or 100% Accuracy.
                     </p>
                     <p>
-                        Clicks must be heard. Click Sounds aren't allowed, or medal overlay is allowed as well if u dont have a mic.
+                        Clicks must be heard, except for some occasions. Click Sounds aren't allowed, or medal overlay is allowed as well if u dont have a mic.
                     </p>
                     <p>
                         You have to be on the latest version of Geometry Dash in order to get your completions/verifications accepted.
