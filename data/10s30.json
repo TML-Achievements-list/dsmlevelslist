@@ -1,18 +1,36 @@
 {
-    "id": 140744149,
-    "name": "10s30",
-    "author": "Aut0plays",
+    "id": 3979721,
+    "name": "Cataclysm (Excessity Never Clear)",
+    "author": "Gboy",
     "creators": [1],
-    "verifier": "Aut0plays",
-    "verification": "https://www.youtube.com/watch?v=X5OMRdGxrVg",
+    "verifier": "CaptainFireball",
+    "verification": "https://www.youtube.com/watch?v=Af6I5iQBpm4",
     "percentToQualify": "100",
     "password": "Free To Copy",
-    "enjoyment": "10s",
+    "enjoyment": "Extreme Demon",
     "transition": true,
     "records": [
+        {
+            "user": "Sunlight",
+            "link": "https://www.youtube.com/watch?v=Af6I5iQBpm4",
+            "percent": 100,
+            "hz": 0
+                 },
                  {
-            "user": "Sandwich",
-            "link": "https://www.youtube.com/watch?v=9FvKPJq1jp4&t=1s",
+            "user": "Peneren",
+            "link": "https://www.youtube.com/watch?v=9MQ0xcGB5po",
+            "percent": 100,
+            "hz": 0
+                 },
+                 {
+            "user": "Midnight",
+            "link": "https://www.youtube.com/watch?v=QQGAhGXB6BE",
+            "percent": 100,
+            "hz": 0
+                 },
+                      {
+            "user": "Dexter",
+            "link": "https://www.youtube.com/watch?v=e6cpj3cCbQs",
             "percent": 100,
             "hz": 0
          }
