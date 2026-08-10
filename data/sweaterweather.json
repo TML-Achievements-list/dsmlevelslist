@@ -10,5 +10,11 @@
     "enjoyment": "Easy Extreme",
     "transition": true,
     "records": [
+        {
+            "user": "shafikdabest",
+            "link": "https://youtu.be/J7mBGjYtOKg?si=Or0c6PJOVTFSjuKl",
+            "percent": 100,
+            "hz": 0
+        }
     ]
 }
