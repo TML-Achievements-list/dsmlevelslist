@@ -1,19 +1,14 @@
 {
-    "id": "93931583",
-    "name": "25728",
-    "author": "Sol-XSL",
+    "id": 123853954,
+    "name": "Iris",
+    "author": "Kaza",
     "creators": [1],
-    "verifier": "MrDrool",
-    "verification": "https://www.youtube.com/watch?v=kBpa3lYG6NI&t=6s",
+    "verifier": "CaptainFireball",
+    "verification": "https://www.youtube.com/watch?v=Vu6m7RkNXk4",
     "percentToQualify": "100",
     "password": "Free To Copy",
-    "enjoyment": "5.777",
+    "enjoyment": "High Tier Extreme",
+    "transition": true,
     "records": [
-                                        {
-            "user": "aelzfr",
-            "link":  "https://youtu.be/rqxLQ9nG1fc",
-            "percent": 100,
-            "hz": 0
-                                               }
     ]
 }
