@@ -1,7 +1,7 @@
 import { store } from "../main.js";
 import { embed } from "../util.js";
 import { score } from "../score.js";
-import { fetchChangelog, fetchEditors, fetchList, fetchdailylul } from "../content.js";
+import { fetchEditors, fetchList, fetchLevel, fetchRecords, fetchPacks } from "../content.js";
 
 import Spinner from "../components/Spinner.js";
 import LevelAuthors from "../components/List/LevelAuthors.js";
@@ -22,49 +22,124 @@ export default {
         </main>
         <main v-else class="page-list">
             <div class="list-container">
-            <input v-model="searchQuery" placeholder="Input text to Filter! here..." class="btn" type="text" id="filterForLevelName" style="width: 80%; margin-bottom: 0.5em;">   
-                <table class="list" v-if="list && list.length">
-                    <tr v-for="(item, i) in filteredListDisplay" :key="item.originalIndex">
+                <!-- SEARCH BOX: inserted here (above the levels list) -->
+                <div id="level-search-wrapper" style="padding:16px;">
+                  <!-- Toggle buttons: Classic / Upcoming -->
+                  <div class="edi-list-toggle" style="display:flex; gap:8px; margin-bottom:8px;">
+                    <button
+                      class="nav__tab"
+                      :class="{ active: activeList === 'classic' }"
+                      type="button"
+                      id="edi-btn-classic"
+                      @click="setActiveList('classic')"
+                    >
+                      Classic list
+                    </button>
+
+                    <button
+                      class="nav__tab"
+                      :class="{ active: activeList === 'upcoming' }"
+                      type="button"
+                      id="edi-btn-upcoming"
+                      @click="setActiveList('upcoming')"
+                    >
+                      Upcoming list
+                    </button>
+                  </div>
+
+                  <input
+                    id="levelSearch"
+                    v-model="searchQuery"
+                    type="search"
+                    placeholder="Search levels..."
+                    aria-label="Search levels"
+                    autocomplete="off"
+                    style="width:100%; padding:10px 12px; border-radius:8px; border:none; background:#2a2a2a; color:#fff; box-sizing:border-box;"
+                  />
+                </div>
+
+                <!-- Classic List View with Legacy Levels -->
+                <table class="list" v-if="list && activeList === 'classic'">
+                    <template v-for="(entry, i) in filteredDemonListClassic">
+                        <tr v-if="entry.isLegacySeparator" :key="'separator-' + i" class="legacy-separator-row">
+                            <td colspan="2" class="legacy-separator">Legacy List</td>
+                        </tr>
+                        <tr v-else :key="entry.index" :class="{ benchmark: entry.isBenchmark, legacy: entry.isLegacy }">
+                            <td class="rank">
+                                <p class="type-label-lg" v-if="!entry.isBenchmark && !entry.isLegacy">#{{ entry.displayIndex }}</p>
+                                <p class="type-label-md" v-else style="margin-left:8px;">-</p>
+                            </td>
+                            <td class="level" :class="{ 'active': selected == entry.index, 'error': !entry.name, 'benchmark-level': entry.isBenchmark, 'legacy-level': entry.isLegacy }">
+                                <button class="level-btn" @click="fetchLvl(entry.index); selected = entry.index">
+                                    <span class="type-label-lg">{{ entry.name || 'Error' }}</span>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </table>
+
+                <!-- Upcoming List View (original behavior) -->
+                <table class="list" v-if="list && activeList === 'upcoming'">
+                    <tr v-for="(entry, i) in filteredDemonList" :key="entry.index" :class="{ benchmark: entry.isBenchmark }">
                         <td class="rank">
-                            <p v-if="item.originalIndex + 1 <= 100" class="type-label-lg">#{{ item.originalIndex + 1 }}</p>
-                            <p v-else class="type-label-lg">Legacy</p>
+                            <p class="type-label-lg" v-if="!entry.isBenchmark && activeList !== 'upcoming'">#{{ entry.displayIndex }}</p>
+                            <p class="type-label-md" v-else style="margin-left:8px;">-</p>
                         </td>
-                        <td class="level" :class="{ 'active': selected == item.originalIndex, 'error': !item.level }">
-                            <button @click="selected = item.originalIndex">
-                                <span class="type-label-lg">{{ item.level?.name || \`Error (\${err}.json)\` }}</span>
+                        <td class="level" :class="{ 'active': selected == entry.index, 'error': !entry.name, 'benchmark-level': entry.isBenchmark }">
+                            <button v-if="!entry.isBenchmark || activeList !== 'upcoming'" class="level-btn" @click="fetchLvl(entry.index); selected = entry.index">
+                                <span class="type-label-lg">{{ entry.name || 'Error' }}</span>
                             </button>
+                            <div v-else class="level-btn">
+                                <span class="type-label-lg">{{ entry.name || 'Error' }}</span>
+                            </div>
                         </td>
                     </tr>
                 </table>
-                <p v-if="list && list.length > 0 && filteredListDisplay && filteredListDisplay.length === 0" class="type-body-lg">
-                    No levels found matching your search.
-                </p>
             </div>
             <div class="level-container">
-                <div class="level" v-if="level || selected != null">
-                    <h1>{{ level.name }}</h1>
+                <div class="level" v-if="level">
+                    <h1>{{ displayedLevelName }}</h1>
                     <LevelAuthors :author="level.author" :creators="level.creators" :verifier="level.verifier"></LevelAuthors>
+                    
+                    <!-- Packs -->
+                    <div v-if="levelPacks.length > 0" class="level-packs-section">
+                        <h3>Packs</h3>
+                        <ul class="level-packs">
+                            <li v-for="pack in levelPacks" :key="pack.name" :style="{ backgroundColor: pack.color, color: pack.textColor }" @click="selectPack(pack)">
+                                {{ pack.name }}
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="video-controls">
+                        <button class="video-btn" :class="{ active: !toggledShowcase }" @click="toggledShowcase = false">Verification</button>
+                        <button v-if="showShowcaseButton" class="video-btn" :class="{ active: toggledShowcase }" @click="toggledShowcase = true">Showcase</button>
+                    </div>
                     <iframe class="video" id="videoframe" :src="video" frameborder="0"></iframe>
                     <ul class="stats">
-                        <li>
+                        <li v-if="activeList === 'classic' && !isLegacyLevel">
                             <div class="type-title-sm">Points when completed</div>
                             <p>{{ score(selected + 1, 100, level.percentToQualify) }}</p>
+                        </li>
+                        <li v-if="isLegacyLevel">
+                            <div class="type-title-sm">Removal Reason</div>
+                            <p>{{ level.reason || 'N/A' }}</p>
+                        </li>
+                        <li v-if="activeList === 'upcoming'">
+                            <div class="type-title-sm">Status</div>
+                            <p>{{ statusText }}</p>
                         </li>
                         <li>
                             <div class="type-title-sm">ID</div>
                             <p>{{ level.id }}</p>
                         </li>
                         <li>
-                            <div class="type-title-sm">Difficulty</div>
-                            <p>{{ level.enjoyment || 'None (0)' }}</p>
-                        </li>
                     </ul>
-                    <h2>Records</h2>
-                    <p v-if="selected + 1 <= 75"><strong>{{ level.percentToQualify }}%</strong> or better to qualify</p>
-                    <p v-else-if="selected +1 <= 100"><strong>100%</strong> or better to qualify</p>
-                    <p v-else>This level does not accept new records.</p>
-                    <table class="records">
-                        <tr v-for="record in level.records" class="record">
+
+                    <!-- Records: only show for classic list and non-legacy levels -->
+                    <h2 v-if="activeList === 'classic' && !isLegacyLevel">Records</h2>
+                    <table class="records" v-if="activeList === 'classic' && !isLegacyLevel">
+                        <tr v-for="(record, idx) in (recordList[level.name] ? recordList[level.name].records : [])" :key="idx" class="record">
                             <td class="percent">
                                 <p>{{ record.percent }}%</p>
                             </td>
@@ -72,39 +147,13 @@ export default {
                                 <a :href="record.link" target="_blank" class="type-label-lg">{{ record.user }}</a>
                             </td>
                             <td class="mobile">
-                                <img v-if="record.mobile" :src="\`/assets/phone-landscape\${store.dark ? '-dark' : ''}.svg\`" alt="Mobile">
+                                <img v-if="record.mobile" :src="'/assets/phone-landscape' + (store.dark ? '-dark' : '') + '.svg'" alt="Mobile">
                             </td>
                         </tr>
                     </table>
                 </div>
-                <div v-else-if="!selected" class="level" style="height: 100%; display: flex; justify-content: center; align-items: center; text-align: center;">
-                    <h2>Welcome to the DSM Levels List!</h2>
-                    <p>Click the levels on the left side to see information about them!</p>
-                    <p>For more information about the submission rules check the right side!</p>
-                    <h2>le daily</h2>
-                    <p>{{ leDaily[0][0].name }} ({{ leDaily[0][0].id }})</p>
-                    <button class="btn" @click="selected = Math.ceil(Math.random() * list.length)">
-                        <span class="type-label-lg">I'm feeling lucky</span>
-                    </button>
-                    <h2>Changelog</h2>
-                    <main style="display: flex; flex-direction: column; align-items: left; gap: 24px; text-align: left; overflow: hidden; overflow-y: auto; max-height: 300px; width: 700px; border: 3px solid var(--color-primary); border-radius: 5px;">
-                        <div style="display: flex; flex-direction: column; align-items: left; gap: 24px; overflow: visible; margin-left: 10px; margin-top: 12px">
-                            <ul style="list-style-type: disc; padding-left: 2rem">
-                                <template v-for="change in changelog">
-                                    <h2 v-if="change.date" style="margin: 1rem; margin-left: -1rem; color: var(--accent);">{{ change.date }}</h2>
-                                    <li v-if="change.action == 'a'" class="cl" style="margin: 0; font-family: 'Lexend Deca', sans-serif"><clw>{{ change.levelname }}</clw> has been placed at <clw>#{{ change.position }}</clw>, above <clw>{{ change.above }}</clw> and below <clw>{{ change.below }}</clw></li>
-                                    <li v-if="change.action == 's'" class="cl" style="margin: 0; font-family: 'Lexend Deca', sans-serif"><clw>{{ change.levelname }}</clw> and <clw>{{ change.swapped }}</clw> have been swapped, with <clw>{{ change.levelname }}</clw> now sitting above at <clw>#{{ change.position }}</clw></li>
-                                    <li v-if="change.action == 'm'" class="cl" style="margin: 0; font-family: 'Lexend Deca', sans-serif"><clw>{{ change.levelname }}</clw> has been raised from <clw>#{{ change.oldposition }}</clw> to <clw>#{{ change.position }}</clw>, above <clw>{{ change.above }}</clw> and below <clw>{{ change.below }}</clw></li>
-                                    <li v-if="change.action == 'l'" class="cl" style="margin: 0; font-family: 'Lexend Deca', sans-serif"><clw>{{ change.levelname }}</clw> has been lowered from <clw>#{{ change.oldposition }}</clw> to <clw>#{{ change.position }}</clw>, above <clw>{{ change.above }}</clw> and below <clw>{{ change.below }}</clw></li>
-                                    <li v-if="change.action == 'd'" class="cl" style="margin: 0; font-family: 'Lexend Deca', sans-serif"><clw>{{ change.levelname }}</clw> has been removed</li>
-                                </template>
-                            </ul>
-                        </div>
-                        <h3 style="text-align: center;" v-if="!changelog">Nothing here yet...</h3>  
-                    </main>
-                </div>
                 <div v-else class="level" style="height: 100%; justify-content: center; align-items: center;">
-                    <p>Error! (If this error doesn't go away after some time, please contact staff)</p>
+                    <p>(ノಠ益ಠ)ノ彡┻━┻</p>
                 </div>
             </div>
             <div class="meta-container">
@@ -113,82 +162,78 @@ export default {
                         <p class="error" v-for="error of errors">{{ error }}</p>
                     </div>
                     <div class="og">
-                        <p class="type-label-md">Website layout made by <a href="https://tsl.pages.dev/" target="_blank">The Shitty List</a></p>
-                        <br>
-                        <p class="type-label-md">Certain features implemented by <a href="https://sgdlist.pages.dev/" target="_blank">The SGD List</a></p>
+                        <p class="type-label-md">Website layout made by <a href="https://tsl.pages.dev/" target="_blank">TheShittyList</a></p>
                     </div>
                     <template v-if="editors">
                         <h3>List Editors</h3>
                         <ol class="editors">
-                            <li v-for="editor in editors">
-                                <img :src="\`/assets/\${roleIconMap[editor.role]}\${store.dark ? '-dark' : ''}.svg\`" :alt="editor.role">
+                            <li v-for="(editor, eidx) in editors" :key="eidx">
+                                <img :src="'/assets/' + roleIconMap[editor.role] + (store.dark ? '-dark' : '') + '.svg'" :alt="editor.role">
                                 <a v-if="editor.link" class="type-label-lg link" target="_blank" :href="editor.link">{{ editor.name }}</a>
                                 <p v-else>{{ editor.name }}</p>
                             </li>
                         </ol>
                     </template>
                     <h3>Submission Requirements</h3>
-                    <p>
-                        Must be apart of the dsm discord server
-                    </p>
-                    <p>
-                        Level must be harder than the level at the lowest spot on the list.
-                    </p>
-                    <p>
-                        No inappropriate levels, as this includes NSFW levels/videos.
-                    </p>
-                    <p>
-                       Levels dont have to be rated
-                    </p>
-                    <p>
-                        uhhhh
-                    </p>
-                    <p>
-                        Secret ways are <strong>absolutely</strong> prohibited.
-                    </p>
-                    <p>
-                        Levels have to be over 30 seconds
-                    </p>
-                    <p>
-                        Levels can not be too spammy
-                    </p>
-                    <p>
-                        Noclip is allowed as long as you have 0 deaths or 100% Accuracy.
-                    </p>
-                    <p>
-                        Clicks must be heard, except for some occasions. Click Sounds aren't allowed, or medal overlay is allowed as well if u dont have a mic.
-                    </p>
-                    <p>
-                        You have to be on the latest version of Geometry Dash in order to get your completions/verifications accepted.
-                    </p>
-                      <p>
-                        When submitting if you submit more than one level at a time it is prefered that you upload in a compilation
-                    </p>
+                    <p>When submitting your record, please ensure that it complies with the following guidelines:</p>
+                    <p>1. Your recording must have clicks that are clearly audible throughout the entire level (Or at the very least most of it). The clicks must be consistent and fully audible from beginning to end. If there was an issue with the audio, we apologize, but we can only accept records where the clicks (or taps, if you are playing on mobile) are clearly audible for the entire duration of the level. Unless you are able to provide us raw footage, then it will be rejected most likely.</p>
+                    <p>2. Your recording must include a cheat indicator on the end screen. If you are playing on vanilla GD or using a mod menu that does not feature a cheat indicator, this requirement does not apply. However, you must specify this in your notes, as we are not responsible for determining which mod menu you used or whether you were playing on vanilla.</p>
+                    <p>3. If you are using an LDM or a bugfix copy of a level, it must either be approved by list staff or clearly make no difference to the gameplay. Use your best judgment, if you are unsure whether your bugfix copy or LDM is acceptable, please ask staff and include the level ID. If you are completely certain that your copy is acceptable, approval is not required for your record to be accepted. If you are unsure what qualifies as an "acceptable" copy, you should also ask staff. Copies that alter gameplay or remove so much detail that the level becomes easier will be denied.</p>
+                    <p>4. Your recording must include an uncut end screen. If the video ends before the end screen is shown or your stats are not visible, the record will not be accepted.</p>
+                    <p>5. It is recommended that you keep raw footage of any levels you complete. If the level places within the top 500, raw footage is required and must include split audio tracks. Submit this along with your original record in a downloadable format, such as Google Drive. If the record was streamed, a Twitch or YouTube VOD with chat enabled is also acceptable. Alternatively, if the record is listed on your Pointercrate profile, you may include that link in the additional information section, and your record will be accepted.</p>
+                    <p>6. This should be self-explanatory, but your record must not be completed using any disallowed mods. This rule also applies to records showing a red cheat indicator, clearly hacked completions, or the use of bots.</p>
+                    <p>7. This should also be really obvious, but you are not allowed to use any secret ways present in the level. You must use the intended path for the level.</p>
                 </div>
             </div>
         </main>
     `,
     data: () => ({
-        list: [],
+        demonList: [],
+        recordList: {},
         editors: [],
+        packs: [],
         loading: true,
-        selected: null,
+        selected: 0,
         errors: [],
         roleIconMap,
+        store,
+        isLoading: false,
+        hasLoaded: false,
+        toggledShowcase: false,
         searchQuery: '',
-        store
+        isLegacyLevel: false
     }),
     computed: {
+        activeList() {
+            return localStorage.getItem('edi_active_list') || 'classic';
+        },
         level() {
-            if (this.selected == null) {
-                return 0;
-            } else {
-                return this.list[this.selected][0];
+            if (!this.hasLoaded) {
+                return [];
             }
+            return this.listLevel ? this.listLevel[0] : [];
+        },
+        displayedLevelName() {
+            if (!this.level || !this.level.name) return '';
+            // Only remove leading dash when the level is a legacy level (we want to keep leading dash for benchmark names like "-critical error-")
+            const name = this.level.name;
+            return name.startsWith('-') && this.isLegacyLevel ? name.substring(1).trim() : name;
+        },
+        showShowcaseButton() {
+            if (this.activeList === 'classic') {
+                if (!this.level || !this.level.showcase) {
+                    return false;
+                }
+                if (this.level.showcase === this.level.verification) {
+                    return false;
+                }
+                return true;
+            }
+            return true;
         },
         video() {
-            if (!this.level.showcase) {
-                return embed(this.level.verification);
+            if (!this.level || !this.level.showcase) {
+                return embed(this.level ? this.level.verification : '');
             }
 
             return embed(
@@ -197,44 +242,165 @@ export default {
                     : this.level.verification
             );
         },
-        originalListWithIndex() {
-            return (this.list || []).map(([level, err], index) => ({
-                level,
-                err,
-                originalIndex: index,
-            }));
+        list() {
+            return this.demonList
         },
-        filteredListDisplay() {
-            if (!this.searchQuery.trim()) {
-                return this.originalListWithIndex;
+        levelPacks() {
+            if (!this.level || !this.level.name) return [];
+            return this.packs.filter(pack => pack.levels.includes(this.level.name));
+        },
+
+        filteredDemonList() {
+            const q = (this.searchQuery || '').toLowerCase().trim();
+
+            const items = this.demonList.map((name, idx) => {
+                const raw = (typeof name === 'string') ? name.trim() : name;
+                // strip any leading dashes/spaces from the displayed name (this prevents "- -name" when rank already shows '-')
+                const isBench = (typeof raw === 'string' && raw.startsWith('-') && raw.toLowerCase() !== '-critical error-' && raw.toLowerCase() !== '-à la belle étoile-');
+                const displayName = isBench ? raw.replace(/^[-\s]+/, '') : raw;
+                return { name: displayName, index: idx, isBenchmark: isBench, rawName: raw };
+            });
+
+            let rank = 0;
+            const withDisplay = items.map(item => {
+                if (!item.isBenchmark) {
+                    rank += 1;
+                    return { ...item, displayIndex: rank };
+                }
+                return { ...item, displayIndex: null };
+            });
+
+            if (!q) return withDisplay;
+            return withDisplay.filter(entry => {
+                if (!entry.name) return false;
+                return entry.name.toLowerCase().includes(q);
+            });
+        },
+
+        filteredDemonListClassic() {
+            const q = (this.searchQuery || '').toLowerCase().trim();
+
+            const items = this.demonList.map((name, idx) => {
+                const raw = (typeof name === 'string') ? name.trim() : name;
+                const isLegacy = (typeof raw === 'string' && raw.startsWith('-') && !raw.toLowerCase().startsWith('-critical error') && !raw.toLowerCase().startsWith('-à la belle étoile'));
+                const isBench = (typeof raw === 'string' && raw.startsWith('-') && !isLegacy && raw.toLowerCase() !== '-critical error-' && raw.toLowerCase() !== '-à la belle étoile-');
+                // strip any leading dashes/spaces for list display to avoid duplicate dash when rank cell shows '-'
+                const displayName = (isBench || isLegacy) ? raw.replace(/^[-\s]+/, '') : raw;
+                return { name: displayName, index: idx, isBenchmark: isBench, isLegacy: isLegacy, rawName: raw, isLegacySeparator: false };
+            });
+
+            let rank = 0;
+            let foundFirstLegacy = false;
+            const withDisplay = items.map(item => {
+                if (!item.isBenchmark && !item.isLegacy) {
+                    rank += 1;
+                    return { ...item, displayIndex: rank };
+                }
+                if (item.isLegacy && !foundFirstLegacy && !q) {
+                    foundFirstLegacy = true;
+                }
+                return { ...item, displayIndex: null };
+            });
+
+            // Build result with separator if needed
+            if (!q) {
+                const result = [];
+                let addedSeparator = false;
+                for (const entry of withDisplay) {
+                    if (entry.isLegacy && !addedSeparator) {
+                        result.push({ isLegacySeparator: true, index: -1 });
+                        addedSeparator = true;
+                    }
+                    result.push(entry);
+                }
+                return result;
             }
-            const searchTerm = this.searchQuery.toLowerCase();
-            return (this.originalListWithIndex || []).filter(item => item.level?.name?.toLowerCase().includes(searchTerm.toLowerCase()));
+
+            // When searching, filter without separator
+            return withDisplay.filter(entry => {
+                if (!entry.name) return false;
+                return entry.name.toLowerCase().includes(q);
+            });
         },
+
+        records() {
+            return this.recordList
+        },
+        statusText() {
+            if (!this.level) return '';
+            const rl = this.recordList && this.recordList[this.level.name] ? this.recordList[this.level.name] : null;
+
+            const interpretExplicit = (val) => {
+                if (val === undefined || val === null) return null;
+                if (typeof val === 'boolean') return val ? 'open' : 'closed';
+                if (typeof val === 'string') {
+                    const s = val.trim();
+                    if (!s) return null;
+                    const lower = s.toLowerCase();
+                    if (lower === 'open' || lower === 'closed') return lower;
+                    return s;
+                }
+                return null;
+            };
+
+            const levelExplicit = interpretExplicit(this.level.openVerification ?? this.level.verificationOpen ?? this.level.status);
+            const recordExplicit = rl ? interpretExplicit(rl.openVerification ?? rl.verificationOpen ?? rl.status) : null;
+
+            const formatDisplay = (s) => {
+                if (!s) return '';
+                const lower = s.toLowerCase();
+                if (lower === 'open') return 'Open Verification';
+                if (lower === 'closed') return 'Closed Verification';
+                return s.charAt(0).toUpperCase() + s.slice(1);
+            };
+
+            if (typeof levelExplicit === 'string' && !['open','closed'].includes(levelExplicit.toLowerCase())) {
+                return formatDisplay(levelExplicit);
+            }
+            if (typeof recordExplicit === 'string' && !['open','closed'].includes(recordExplicit.toLowerCase())) {
+                return formatDisplay(recordExplicit);
+            }
+
+            if (levelExplicit === 'open' || recordExplicit === 'open') return 'Open Verification';
+            if (levelExplicit === 'closed' || recordExplicit === 'closed') return 'Closed Verification';
+
+            return '';
+        }
     },
     async mounted() {
-        // Hide loading spinner
-        this.list = await fetchList();
-        this.editors = await fetchEditors();
-        this.changelog = await fetchChangelog();
-        this.leDaily = await fetchdailylul();
-        if (Math.floor(Math.random() * 100) == 12) {
-            localStorage.setItem('purple', "true");
+        if (!localStorage.getItem('edi_active_list')) {
+            localStorage.setItem('edi_active_list', 'classic');
         }
 
-        // Error handling
+        this.demonList = await fetchList();
+        this.recordList = await fetchRecords();
+        this.editors = await fetchEditors();
+        this.packs = await fetchPacks();
+        
+        const queryLevel = this.$route.query.level;
+        if (queryLevel) {
+            this.selected = this.demonList.indexOf(queryLevel);
+            if (this.selected === -1) this.selected = 0;
+        }
+        
+        this.listLevel = await fetchLevel(this.list[this.selected])
+        this.hasLoaded = true;
+        this.checkIfLegacy();
+
+        if (this.activeList === 'upcoming') {
+            const firstNonBench = this.filteredDemonList.find(entry => !entry.isBenchmark);
+            if (firstNonBench && firstNonBench.index !== this.selected) {
+                this.selected = firstNonBench.index;
+                this.listLevel = await fetchLevel(this.list[this.selected]);
+                this.checkIfLegacy();
+            }
+        }
+
         if (!this.list) {
             this.errors = [
                 "Failed to load list. Retry in a few minutes or notify list staff.",
             ];
         } else {
-            this.errors.push(
-                ...this.list
-                    .filter(([_, err]) => err)
-                    .map(([_, err]) => {
-                        return `Failed to load level. (${err}.json)`;
-                    })
-            );
             if (!this.editors) {
                 this.errors.push("Failed to load list editors.");
             }
@@ -245,5 +411,42 @@ export default {
     methods: {
         embed,
         score,
+        setActiveList(key) {
+            if (key !== 'classic' && key !== 'upcoming') return;
+            localStorage.setItem('edi_active_list', key);
+            location.reload();
+        },
+        selectPack(pack) {
+            this.$router.push({ path: '/packs', query: { pack: pack.name } });
+        },
+        checkIfLegacy() {
+            let entry;
+            if (this.activeList === 'classic') {
+                entry = this.filteredDemonListClassic.find(e => e.index === this.selected && !e.isLegacySeparator);
+            } else {
+                entry = this.filteredDemonList.find(e => e.index === this.selected);
+            }
+            this.isLegacyLevel = entry ? entry.isLegacy : false;
+        },
+        async fetchLvl(i) {
+            if (this.isLoading) {
+                return;
+            }
+            this.hasLoaded = false
+            this.isLoading = true;
+            try {
+                console.log(i)
+                this.listLevel = await fetchLevel(this.demonList[i])
+                if(!this.level) {
+                    this.errors = [
+                        "Failed to load level"
+                    ]
+                }
+                this.hasLoaded = true;
+                this.checkIfLegacy();
+            } finally {
+                this.isLoading = false;
+            }
+        },
     },
 };
