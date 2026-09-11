@@ -1,209 +1,285 @@
 import { store } from "../main.js";
-import { embed, getYoutubeIdFromUrl } from "../util.js";
+import { embed } from "../util.js";
+import { fetchPacks, fetchLevel, fetchRecords, calculatePackPoints } from "../content.js";
 import { score } from "../score.js";
-import { fetchEditors, fetchList, fetchPacks } from "../content.js";
 
 import Spinner from "../components/Spinner.js";
 import LevelAuthors from "../components/List/LevelAuthors.js";
 
-const roleIconMap = {
-    owner: "crown",
-    admin: "user-gear",
-    helper: "user-shield",
-    dev: "code",
-    trial: "user-lock",
-};
+const dir = '/data';
 
 export default {
     components: { Spinner, LevelAuthors },
-    template: `
-        <main v-if="loading">
-            <Spinner></Spinner>
-        </main>
-        <main v-else class="page-list" style="grid-template-columns: auto minmax(16rem, 0.4fr) 1fr;">
-            <div class="list-container">
-                <table class="list" v-if="packs && packs.length">
-                    <tr v-for="([pack, err], i) in filteredPacksDisplay">
-                        <td class="level" :class="{ 'active': packSelected === i }">
-                            <button @click="packSelected = i" :class="{ 'active': packSelected === i, 'error': !pack }" >
-                                <span class="type-label-lg">{{ pack.name || \`Error (\${err}.json)\` }}</span>
-                            </button>
-                        </td>
-                    </tr>
-                </table>
-                <p v-if="list && list.length > 0 && filteredListDisplay && filteredListDisplay.length === 0" class="type-body-lg">
-                    No levels found matching your search.
-                </p>
-            </div>
-            <div class="list-container">
-                <table class="list" v-if="list && list.length">
-                    <tr v-for="(item, i) in filteredListPackDisplay" :key="item.originalIndex">
-                        <td class="rank">
-                            <p v-if="item.originalIndex + 1 <= 150" class="type-label-lg">#{{ item.originalIndex + 1 }}</p>
-                            <p v-else class="type-label-lg">Legacy</p>
-                        </td>
-                        <td class="level" :class="{ 'active': selected == item.originalIndex, 'error': !item.level }">
-                            <button @click="selected = item.originalIndex">
-                                <span class="type-label-lg">{{ item.level?.name || \`Error (\${err}.json)\` }}</span>
-                            </button>
-                        </td>
-                    </tr>
-                </table>
-                <p v-if="list && list.length > 0 && filteredListDisplay && filteredListDisplay.length === 0" class="type-body-lg">
-                    No levels found matching your search.
-                </p>
-            </div>
-            <div class="level-container">
-                <div class="level" v-if="level || selected != null">
-                    <h1>{{ level.name }}</h1>
-                    <LevelAuthors :author="level.author" :creators="level.creators" :verifier="level.verifier"></LevelAuthors>
-                    <iframe class="video" id="videoframe" :src="video" frameborder="0"></iframe>
-                    <ul class="stats">
-                        <li>
-                            <div class="type-title-sm">Points when completed</div>
-                            <p>{{ score(selected + 1, 100, level.percentToQualify) }}</p>
-                        </li>
-                        <li>
-                            <div class="type-title-sm">ID</div>
-                            <p>{{ level.id }}</p>
-                        </li>
-                        <li>
-                            <div class="type-title-sm">Method</div>
-                            <p>{{ level.enjoyment || 'None (0)' }}</p>
-                        </li>
-                    </ul>
-                    <h2>Records</h2>
-                    <p v-if="selected + 1 <= 75"><strong>{{ level.percentToQualify }}%</strong> or better to qualify</p>
-                    <p v-else-if="selected +1 <= 150"><strong>100%</strong> or better to qualify</p>
-                    <p v-else>This level does not accept new records.</p>
-                    <table class="records">
-                        <tr v-for="record in level.records" class="record">
-                            <td class="percent">
-                                <p>{{ record.percent }}%</p>
-                            </td>
-                            <td class="user">
-                                <a :href="record.link" target="_blank" class="type-label-lg">{{ record.user }}</a>
-                            </td>
-                            <td class="mobile">
-                                <img v-if="record.mobile" :src="\`/assets/phone-landscape\${store.dark ? '-dark' : ''}.svg\`" alt="Mobile">
-                            </td>
-                            <td class="hz">
-                                <p>{{ record.hz }}Enj</p>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-                <div v-else-if="!selected" class="level" style="height: 100%; display: flex; justify-content: center; align-items: center; text-align: center;">
-                    	<h3>Select a pack to see its levels!</h3>
-                </div>
-                <div v-else class="level" style="height: 100%; justify-content: center; align-items: center;">
-                    <p>Error! (If this error doesn't go away after some time, please contact staff)</p>
-                </div>
-            </div>
-        </main>
-    `,
     data: () => ({
+        packs: [],
         list: [],
-        editors: [],
+        levels: {},        // cached level data by name
+        recordList: {},
         loading: true,
-        selected: null,
-        packSelected: null,
-        engineSelected: "All",
-		grat: "../assets/levels/",
-        ideae: ".webp",
-        levelSearch: null,
+        selectedPack: null,
+        selectedLevelObj: null, // { name, index, points, level }
+        loadingPackDetails: false,
+        packPointsCache: {},
         searchQuery: '',
-        ii: 0,
-        blt: 0,
-        errors: [],
-        roleIconMap,
-        store
+        toggledShowcase: false,
     }),
-    computed: {
-        level() {
-            if (this.selected == null) {
-            	return null;
-            } else {
-                return this.list[this.selected][0];
-            }
-        },
-        showPacks() {
-            if (this.packSelected) {
-            console.error(this.packs[this.packSelected][0].levels);
-            return this.packs[this.packSelected][0].levels;
-            }
-            console.error(this.packs[0][0].levels);
-            return this.packs[0][0].levels;
-        },
-        originalListWithIndex() {
-            return (this.list || []).map(([level, err], index) => ({
-                level,
-                err,
-                originalIndex: index,
-            }));
-        },
-        filteredListDisplay() {
-            if (!this.searchQuery.trim()) {
-                return this.originalListWithIndex;
-            }
-            const searchTerm = this.searchQuery.toLowerCase();
-            console.error((this.originalListWithIndex || []).filter(item => item.level?.name?.toLowerCase().includes(searchTerm) && item.level?.engine?.includes(this.engineAsked)));
-            return (this.originalListWithIndex || []).filter(item => item.level?.name?.toLowerCase().includes(searchTerm) && item.level?.engine?.includes(this.engineAsked));
-		},
-        filteredListPackDisplay() {
-            if (this.packSelected || this.packSelected == 0) {
-                return (this.originalListWithIndex || []).filter(item => this.packs[this.packSelected][0].levels.includes(item.level?.name));
-            }
-            return 0;
-		},
-        originalPacksWithIndex() {
-            console.error(this.packs);
-            return this.packs;
-        },
-        filteredPacksDisplay() {
-            return this.originalPacksWithIndex;
-		},
-
-        video() {
-            if (!this.level.showcase) {
-                return embed(this.level.verification);
-            }
-
-            return embed(
-                this.toggledShowcase
-                    ? this.level.showcase
-                    : this.level.verification
-            );
-        },
-    },
     async mounted() {
-        // Hide loading spinner
-        this.list = await fetchList();
-        this.packs = await fetchPacks();
-        this.editors = await fetchEditors();
+        // Always use classic list for packs
+        const classicResult = await fetch(`${dir}/_list.json`);
+        let classicList;
+        try {
+            classicList = await classicResult.json();
+        } catch (e) {
+            console.error('Failed to load classic list for packs.', e);
+            this.list = [];
+        }
+        this.list = classicList || [];
 
-        // Error handling
-        if (!this.list) {
-            this.errors = [
-                "Failed to load list. Retry in a few minutes or notify list staff.",
-            ];
-        } else {
-            this.errors.push(
-                ...this.list
-                    .filter(([_, err]) => err)
-                    .map(([_, err]) => {
-                        return `Failed to load level. (${err}.json)`;
-                    })
-            );
-            if (!this.editors) {
-                this.errors.push("Failed to load list editors.");
+        // Load records data (kept for the app; records are hidden per request)
+        this.recordList = await fetchRecords();
+
+        this.packs = await fetchPacks();
+        
+        // Pre-calculate all pack points for instant display
+        for (const pack of this.packs) {
+            try {
+                this.packPointsCache[pack.name] = await calculatePackPoints(pack.levels, this.list, this.recordList);
+            } catch {
+                this.packPointsCache[pack.name] = 0;
             }
         }
 
         this.loading = false;
+
+        // Check for pack query param (optional)
+        const queryPack = this.$route.query.pack;
+        if (queryPack) {
+            const pack = this.packs.find(p => p.name === queryPack);
+            if (pack) {
+                this.selectPack(pack);
+            }
+        }
+    },
+    computed: {
+        // Levels for the selected pack (array of { name, index, points, level })
+        packLevels() {
+            if (!this.selectedPack) return [];
+            return this.selectedPack.levels.map(name => {
+                const index = this.list.indexOf(name);
+                const level = this.levels[name];
+                const points = level && index >= 0 ? score(index + 1, 100, level.percentToQualify) : 0;
+                return {
+                    name,
+                    index,
+                    points,
+                    level,
+                };
+            }).filter(l => l.index >= 0).sort((a, b) => a.index - b.index);
+        },
+        packReward() {
+            const total = this.packLevels.reduce((sum, l) => sum + l.points, 0);
+            return Math.floor(total * 0.5);
+        },
+        filteredPacks() {
+            if (!this.searchQuery) return this.packs;
+            const q = this.searchQuery.toLowerCase();
+            return this.packs.filter(p => p.name.toLowerCase().includes(q));
+        },
+        // video URL for iframe (uses embed util)
+        video() {
+            if (!this.selectedLevelObj || !this.selectedLevelObj.level) return '';
+            const lvl = this.selectedLevelObj.level;
+            const chosen = this.toggledShowcase ? (lvl.showcase || lvl.verification || lvl.video) : (lvl.verification || lvl.showcase || lvl.video);
+            if (!chosen) return '';
+            return embed(chosen);
+        },
+        showShowcaseButton() {
+            return this.selectedLevelObj && this.selectedLevelObj.level && !!(this.selectedLevelObj.level.showcase);
+        },
     },
     methods: {
-        embed,
-        score,
+        getPackPoints(packName) {
+            return this.packPointsCache[packName] || 0;
+        },
+
+        // Parse creators string into array
+        parseCreators(creatorsString) {
+            if (!creatorsString || typeof creatorsString !== 'string') return [];
+            return creatorsString.split(',').map(c => c.trim()).filter(c => c);
+        },
+
+        // select a pack object (lazy load individual levels into this.levels)
+        async selectPack(pack) {
+            this.selectedPack = pack;
+            this.selectedLevelObj = null;
+            this.loadingPackDetails = true;
+            try {
+                for (const levelName of pack.levels) {
+                    if (!this.levels[levelName]) {
+                        const levelData = await fetchLevel(levelName);
+                        if (levelData[0]) {
+                            this.levels[levelName] = levelData[0];
+                        }
+                    }
+                }
+            } finally {
+                this.loadingPackDetails = false;
+            }
+
+            // Pick the level that appears earliest in the current list (lowest index).
+            // Falls back to the first pack.levels entry if none of the pack levels are in the list.
+            if (pack.levels && pack.levels.length > 0) {
+                let bestName = null;
+                let bestIdx = Infinity;
+
+                for (const levelName of pack.levels) {
+                    const idx = this.list.indexOf(levelName);
+                    if (idx >= 0 && idx < bestIdx) {
+                        bestIdx = idx;
+                        bestName = levelName;
+                    }
+                }
+
+                // fallback to first in pack array if nothing matched the list
+                if (!bestName) {
+                    bestName = pack.levels[0];
+                }
+
+                // pass the already-loaded level object when available to avoid refetching
+                await this.selectLevel({ name: bestName, level: this.levels[bestName] });
+            }
+        },
+
+        // load and display level in center (List-style), WITHOUT rendering Records
+        async selectLevel(level) {
+            this.selectedLevelObj = null;
+            if (!level.level) {
+                try {
+                    const [loaded] = await fetchLevel(level.name);
+                    if (loaded) {
+                        this.levels[level.name] = loaded;
+                        level.level = loaded;
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch level', level.name, e);
+                }
+            }
+
+            const lvl = level.level || this.levels[level.name];
+            if (!lvl) return;
+
+            const index = this.list.indexOf(lvl.name);
+            const points = index >= 0 ? score(index + 1, 100, lvl.percentToQualify) : 0;
+
+            this.selectedLevelObj = {
+                name: lvl.name,
+                index,
+                points,
+                level: lvl,
+            };
+
+            this.toggledShowcase = false;
+        },
     },
+    template: `
+        <main v-if="loading">
+            <Spinner />
+        </main>
+
+        <main v-else class="page-packs">
+            <!-- LEFT: Packs list -->
+            <div class="packs-container">
+                <h2>Packs</h2>
+
+                <div style="padding:0 0.5rem 0.5rem;">
+                    <input id="packSearch" v-model="searchQuery" placeholder="Search packs..." />
+                </div>
+
+                <div class="packs-list">
+                    <div v-for="pack in filteredPacks" :key="pack.name" class="pack-item" :class="{ active: selectedPack === pack }" @click="selectPack(pack)"
+                         :style="{ background: pack.gradient ? pack.gradient : (pack.color ? pack.color : 'var(--color-background)') }">
+                        <!-- per-pack text color applied inline; if no textColor uses site on-background -->
+                        <div class="pack-name" :style="{ color: pack.textColor ? pack.textColor : 'var(--color-on-background)' }">{{ pack.name }}</div>
+                        <div class="pack-meta">
+                            <span class="pack-levels-count">{{ pack.levels.length }} levels</span>
+                            <span class="pack-points">{{ getPackPoints(pack.name) }} pts</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CENTER: Level details (List-style) -->
+            <div class="level-container">
+                <div class="level" v-if="selectedLevelObj && selectedLevelObj.level">
+                    <h1>{{ selectedLevelObj.level.name }}</h1>
+                    <LevelAuthors :author="selectedLevelObj.level.author" :creators="selectedLevelObj.level.creators || []" :verifier="selectedLevelObj.level.verifier"></LevelAuthors>
+                    
+                    <!-- Pack creator info -->
+                    <div v-if="selectedPack && (selectedPack.creators || selectedPack.verifier || selectedPack.publisher)" class="pack-info">
+                        <h3>Pack Info</h3>
+                        <LevelAuthors 
+                            :author="selectedPack.author || selectedPack.publisher || 'Unknown'"
+                            :creators="parseCreators(selectedPack.creators)"
+                            :verifier="selectedPack.verifier || 'Unknown'"
+                        ></LevelAuthors>
+                    </div>
+
+                    <div class="video-controls">
+                        <button class="video-btn" :class="{ active: !toggledShowcase }" @click="toggledShowcase = false">Verification</button>
+                        <button v-if="showShowcaseButton" class="video-btn" :class="{ active: toggledShowcase }" @click="toggledShowcase = true">Showcase</button>
+                    </div>
+
+                    <iframe v-if="video" class="video" id="videoframe" :src="video" frameborder="0"></iframe>
+
+                    <ul class="stats">
+                        <li>
+                            <div class="type-title-sm">Points when completed</div>
+                            <p>{{ selectedLevelObj.points }}</p>
+                        </li>
+                        <li>
+                            <div class="type-title-sm">ID</div>
+                            <p>{{ selectedLevelObj.level.id }}</p>
+                        </li>
+                        <li v-if="selectedLevelObj.level.length">
+                            <div class="type-title-sm">Length</div>
+                            <p>{{ selectedLevelObj.level.length }}</p>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Pack placeholder / no selection -->
+                <div v-else class="level">
+                    <div v-if="selectedPack">
+                        <div v-if="loadingPackDetails" class="pack-loading"><Spinner/></div>
+                        <div v-else style="color:var(--color-on-background); margin-top:12px;">Select a level on the right to view details here.</div>
+                    </div>
+                    <div v-else style="height: 100%; justify-content: center; align-items: center; display: flex;">
+                        <p>Select a pack to view details</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: levels in pack -->
+            <div class="level-container">
+                <h2>Levels</h2>
+
+                <div v-if="!packLevels || packLevels.length === 0" class="level" style="justify-content: center; align-items: center;">
+                    <p>Pick a pack to see levels</p>
+                </div>
+
+                <table v-else class="list">
+                    <tr v-for="level in packLevels" :key="level.name" :class="{ active: selectedLevelObj && selectedLevelObj.name === level.name }">
+                        <td class="rank">
+                            <p class="type-label-lg">#{{ level.index + 1 }}</p>
+                        </td>
+                        <td class="level" :class="{ active: selectedLevelObj && selectedLevelObj.name === level.name }">
+                            <button class="level-btn" @click="selectLevel(level)">
+                                <span class="type-label-lg">{{ level.name }}</span>
+                            </button>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </main>
+    `,
 };
