@@ -3,10 +3,10 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=1024" />
-        <title>MSAC Levels List</title>
+        <title>MSACLL</title>
 
-        <!-- Replace your server icon by uploading an image file named "list_icon.png"-->
-        <link rel="icon" href="/30fps.png" />
+        <!-- Replace your icon by uploading an image file named "list_icon.png"-->
+        <link rel="icon" href="30fps.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
@@ -22,6 +22,7 @@
             type="text/css"
             href="/css/pages/leaderboard.css"
         />
+        <link rel="stylesheet" type="text/css" href="/css/pages/packs.css" />
         <link rel="stylesheet" type="text/css" href="/css/pages/roulette.css" />
         <link rel="stylesheet" type="text/css" href="/css/components/nav.css" />
         <link rel="stylesheet" type="text/css" href="/css/components/btn.css" />
@@ -35,10 +36,10 @@
         <script type="module" src="/js/main.js"></script>
     </head>
     <body id="app">
-        <header :class="{ dark: store.dark, 'purple': store.purple }">
+        <header :class="{ dark: store.dark }">
             <div class="logo">
-                <h2>MSAC Levels List</h2>
-                <p>v2.1</p>
+                <h2>MSACLL</h2>
+                <p>v1.0.0</p>
             </div>
             <nav class="nav">
                 <router-link class="nav__tab" to="/">
@@ -47,11 +48,11 @@
                 <router-link class="nav__tab" to="/leaderboard">
                     <span class="type-label-lg">Leaderboard</span>
                 </router-link>
-                <router-link class="nav__tab" to="/roulette">
-                    <span class="type-label-lg">Roulette</span>
-                </router-link>
                 <router-link class="nav__tab" to="/packs">
                     <span class="type-label-lg">Packs</span>
+                </router-link>
+                <router-link class="nav__tab" to="/roulette">
+                    <span class="type-label-lg">Roulette</span>
                 </router-link>
                 <div class="nav__actions">
                     <button
@@ -64,18 +65,26 @@
                         />
                     </button>
                     <!-- Replace the '#' with your discord server's invite-->
-                    <a class="nav__icon" href="https://discord.gg/H2UG6xwmec">
+                    <a class="nav__icon" href="https://discord.gg/TEqvKS5H5N">
                         <img src="/assets/discord.svg" alt="Discord Logo" />
                     </a>
                     <!-- List record submission form, add a link to replace the '#' when putting a link to your list submission form-->
                     <a
                         class="nav__cta type-label-lg"
-                        href="https://discord.gg/H2UG6xwmec"
-                        >Submit Level</a
+                        href="https://discord.gg/TEqvKS5H5N"
+                        target="_blank"
+                        >Submit Record</a
+                    >
+                    <!-- Pending Levels button -->
+                    <a
+                        class="nav__cta type-label-lg"
+                        href="https://docs.google.com/spreadsheets/d/1M4iT0nL5W9wcKc4EPJO7NaCUpzDgmXvDo4WgcZekO5w/edit?usp=sharing"
+                        target="_blank"
+                        >Pending Levels</a
                     >
                 </div>
             </nav>
         </header>
-        <router-view :class="{ dark: store.dark, 'purple': store.purple }"></router-view>
+        <router-view :class="{ dark: store.dark }"></router-view>
     </body>
-    </html>
+</html>
